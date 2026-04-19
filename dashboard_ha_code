@@ -1,0 +1,896 @@
+sections:
+  - type: grid
+    cards:
+      - type: custom:button-card
+        entity: sensor.sejour_exterieur_temperature
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - background: transparent
+            - border: none
+            - box-shadow: none
+            - height: 220px
+            - padding: 0
+            - position: relative
+            - overflow: hidden
+            - margin-left: "-21px"
+            - margin-top: 3px
+          custom_fields:
+            row1:
+              - position: absolute
+              - inset: 0
+              - width: 100%
+              - height: 100%
+        custom_fields:
+          row1: |
+            [[[
+              // --- température ---
+              const v = parseFloat(entity.state);
+              const t = isNaN(v) ? `${entity.state}` : `${v.toFixed(1)}°`;
+
+              // Humidité
+              const h = states['sensor.sejour_exterieur_humidite']?.state ?? '—';
+              const hNum = Number(h);
+              const hTxt = Number.isFinite(hNum) ? Math.round(hNum) : h;
+
+              // --- météo + nuit ---
+              const w = states['weather.la_gorgue'];
+              const c = w ? w.state : 'unknown';
+
+              const sun = states['sun.sun'];
+              const isNight = sun ? (sun.state === 'below_horizon') : false;
+
+              const map = {
+                'sunny': 'mdi:weather-sunny',
+                'clear-night': 'mdi:weather-night',
+                'partlycloudy': 'mdi:weather-partly-cloudy',
+                'cloudy': 'mdi:weather-cloudy',
+                'overcast': 'mdi:weather-cloudy',
+                'fog': 'mdi:weather-fog',
+                'hazy': 'mdi:weather-hazy',
+                'rainy': 'mdi:weather-rainy',
+                'pouring': 'mdi:weather-pouring',
+                'lightning': 'mdi:weather-lightning',
+                'lightning-rainy': 'mdi:weather-lightning-rainy',
+                'snowy': 'mdi:weather-snowy',
+                'snowy-rainy': 'mdi:weather-snowy-rainy',
+                'windy': 'mdi:weather-windy',
+                'windy-variant': 'mdi:weather-windy-variant',
+                'hail': 'mdi:weather-hail',
+                'exceptional': 'mdi:weather-cloudy-alert'
+              };
+
+              const nightMap = {
+                'sunny': 'mdi:weather-night',
+                'partlycloudy': 'mdi:weather-night-partly-cloudy',
+                'cloudy': 'mdi:weather-night-partly-cloudy',
+                'overcast': 'mdi:weather-night-partly-cloudy'
+              };
+
+              let icon = map[c] || 'mdi:weather-cloudy-alert';
+              if (isNight && nightMap[c]) icon = nightMap[c];
+
+              // --- overlay risque pluie/neige/verglas (coin haut droit) ---
+              const toPct = (id) => {
+                const s = states[id]?.state;
+                const n = parseFloat(s);
+                return Number.isFinite(n) ? n : null;
+              };
+
+              const rain = toPct('sensor.la_gorgue_rain_chance');
+              const snow = toPct('sensor.la_gorgue_snow_chance');
+              const ice  = toPct('sensor.la_gorgue_freeze_chance');
+
+              const TH = 30; // seuil d'affichage (%). Mets 20 si tu veux plus sensible.
+
+              let riskIcon = '';
+              let riskVal = null;
+
+              const consider = (val, iconName) => {
+                if (val === null) return;
+                if (val < TH) return;
+                if (riskVal === null || val > riskVal) {
+                  riskVal = val;
+                  riskIcon = iconName;
+                }
+              };
+
+              consider(rain, 'mdi:weather-rainy');
+              consider(snow, 'mdi:weather-snowy');
+              consider(ice,  'mdi:snowflake-alert');
+
+              const riskHtml = (riskVal !== null) ? `
+                <div style="
+                  position:absolute;
+                  top:8px;
+                  right:10px;
+                  display:flex;
+                  align-items:center;
+                  gap:6px;
+                  font-size:13px;
+                  font-weight:700;
+                  color:#000;
+                  line-height:1;
+                ">
+                  <ha-icon icon="${riskIcon}" style="width:20px;height:20px;color:#000;"></ha-icon>
+                  ${riskVal.toFixed(0)}%
+                </div>
+              ` : '';
+
+              // Réglages
+              const BAR_W = 8;
+              const GAP = 18;
+
+              return `
+                <div style="
+                  position:relative;
+                  height:100%;
+                  width:100%;
+                  display:grid;
+                  grid-template-columns: ${BAR_W}px ${GAP}px 1fr;
+                  align-items:center;
+                ">
+
+                  ${riskHtml}
+
+                  <!-- BARRE -->
+                  <div style="
+                    height:200px;
+                    width:${BAR_W}px;
+                    border-radius:4px;
+                    justify-self:start;
+                    align-self:center;
+                    margin-top:1px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div></div>
+
+                  <!-- CONTENU -->
+                  <div style="
+                    height:90%;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:space-between;
+                    align-items:flex-start;
+                    min-width:0;
+                  ">
+
+                    <!-- icône météo -->
+                    <div style="
+                      flex:1;
+                      width:135px;
+                      display:flex;
+                      align-items:center;
+                      justify-content:center;
+                    ">
+                      <ha-icon icon="${icon}" style="width:60px;height:60px;color:#000;"></ha-icon>
+                    </div>
+
+                    <!-- bas carte -->
+                    <div style="
+                      display:flex;
+                      flex-direction:column;
+                      align-items:flex-start;
+                      gap:6px;
+                    ">
+
+                      <div style="margin-bottom:1px;font-size:56px;font-weight:600;line-height:1;color:#000;">
+                        ${t}
+                      </div>
+
+                      <div style="margin-bottom:5px;font-size:15px;font-weight:600;color:#000;">
+                        Taux d'humidité ${hTxt}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 6
+      - type: custom:apexcharts-card
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent;
+              border: 0;
+              box-shadow: none;
+              padding: 0;
+              width: calc(100% + 20px);
+              transform: translateX(-20px);
+              }
+        header:
+          show: false
+        graph_span: 24h
+        span:
+          end: minute
+        apex_config:
+          chart:
+            height: 220px
+            toolbar:
+              show: false
+            zoom:
+              enabled: false
+            animations:
+              enabled: false
+          tooltip:
+            enabled: false
+          stroke:
+            width: 3
+            curve: smooth
+            lineCap: round
+          markers:
+            size: 0
+          grid:
+            padding:
+              left: 10
+              right: 1
+              top: 0
+              bottom: 0
+          xaxis:
+            type: datetime
+            tickAmount: 6
+            labels:
+              datetimeFormatter:
+                hour: HH:mm
+              hideOverlappingLabels: true
+              style:
+                colors: "#000"
+                fontSize: 12px
+          yaxis:
+            forceNiceScale: true
+            labels:
+              formatter: |
+                EVAL:function(v){ return Math.round(v) + "°"; }
+              style:
+                colors: "#000"
+                fontSize: 12px
+            axisBorder:
+              show: false
+            axisTicks:
+              show: false
+        series:
+          - entity: sensor.sejour_exterieur_temperature
+            name: ""
+            color: "#000"
+        grid_options:
+          columns: 10
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - background: transparent
+            - border: 0
+            - box-shadow: none
+            - height: 220px
+            - padding: 0
+            - display: flex
+            - align-items: center
+            - margin-left: 24px
+            - margin-top: 3px
+          grid:
+            - grid-template-areas: |
+                "row1"
+                "row2"
+                "row3"
+            - grid-template-rows: 1fr 1fr 1fr
+            - row-gap: 6px
+        custom_fields:
+          row1: |
+            [[[
+              const raw = states['sensor.sejour_temperature']?.state;
+              const v = Number(raw);
+              const t = Number.isFinite(v) ? v.toFixed(1) : '—';
+            return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;"></div>
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                    <ha-icon icon="mdi:thermometer" style="width:30px;height:30px;color:black;"></ha-icon>
+                  </div>
+                  <div style="text-align:left;">
+                    <div style="background:black;color:white;font-size:14px;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block;">
+                      Température intérieure
+                    </div>
+                    <div style="color: black; font-size:26px;font-weight:500;line-height:1; margin-top:6px;">
+                      ${t}°
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+          row2: |
+            [[[
+              const h = states['sensor.sejour_humidite']?.state ?? '—';
+              return `        <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;"></div>
+              
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                    <ha-icon icon="mdi:water-percent" style="width:30px;height:30px;color:black;"></ha-icon>
+                  </div>
+                  <div style="text-align:left;">
+                    <div style="background:black;color:white;font-size:14px;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block;">
+                      Humidité intérieure
+                    </div>
+                    <div style="color: black; font-size:26px;font-weight:500;line-height:1; margin-top:6px;">
+                      ${h}%
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+          row3: |
+            [[[
+              const c = states['sensor.sejour_dioxyde_de_carbone']?.state ?? '—';
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;"></div>
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                    <ha-icon icon="mdi:molecule-co2" style="width:30px;height:30px;color:black;"></ha-icon>
+                  </div>
+                  <div style="text-align:left;">
+                    <div style="background:black;color:white;font-size:14px;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block;">
+                      Dioxyde de carbone
+                    </div>
+                    <div style="color: black; font-size:26px;font-weight:500;line-height:1; margin-top:6px;">
+                      ${c} ppm
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 8
+    column_span: 3
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_state: false
+        styles:
+          card:
+            - height: 1px
+            - background: rgba(0,0,0,0.2)
+            - border: none
+            - box-shadow: none
+            - padding: 0
+            - margin-top: "-18px"
+            - margin-bottom: 0px
+            - margin-left: 0px
+            - margin-right: 0px
+        grid_options:
+          columns: 24
+    column_span: 3
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - background: transparent
+            - border: none
+            - height: 160px
+            - box-shadow: none
+            - padding: 0
+            - position: relative
+            - overflow: hidden
+            - margin-left: "-21px"
+            - margin-top: "-33px"
+          grid:
+            - grid-template-areas: |
+                "row1"
+                "row2"
+            - grid-template-rows: 1fr 1fr
+            - row-gap: 6px
+        custom_fields:
+          row1: |
+            [[[
+              const toNum = (s) => {
+                const n = parseInt(s, 10);
+                return Number.isFinite(n) ? n : null;
+              };
+
+              const qRaw = states['sensor.qualite_globale_la_gorgue']?.state ?? '—';
+              const qNum = toNum(qRaw);
+
+              let qTxt = '—';
+              if (qNum === 1) qTxt = 'bon';
+              else if (qNum === 2) qTxt = 'moyen';
+              else if (qNum === 3) qTxt = 'dégradé';
+              else if (qNum === 4) qTxt = 'mauvais';
+              else if (qNum === 5) qTxt = 'très mauvais';
+              else if (qNum === 6) qTxt = 'extrêmement mauvais';
+              else if (qNum === 7) qTxt = 'évènement';
+
+              const qVal = (qNum === null) ? '—' : qNum;
+
+              let airDisplay = `${qVal} ${qTxt}`;
+              if (qNum !== null && qNum >= 5) {
+                airDisplay = `<span style="background:black;color:white;padding:2px 6px;border-radius:4px;">${qVal} ${qTxt}</span>`;
+              }
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                      <ha-icon icon="mdi:air-filter" style="width:26px;height:26px;color:black;"></ha-icon>
+                    </div>
+
+                    <div style="text-align:left;">
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Indice de qualité de l'air
+                      </div>
+                      <div style="color:black;font-size:23px;font-weight:500;margin-top:6px;">
+                        ${airDisplay} <span style="font-size:15px;font-weight:500;"></span> 
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+          row2: |
+            [[[
+              // --- MIN/MAX depuis helpers ---
+              const sMin = states['input_number.jardin_tmin_mf'];
+              const sMax = states['input_number.jardin_tmax_mf'];
+
+              const toNum = (s) => {
+                const n = parseFloat(s);
+                return Number.isFinite(n) ? n : null;
+              };
+
+              const tmin = sMin ? toNum(sMin.state) : null;
+              const tmax = sMax ? toNum(sMax.state) : null;
+
+              const fmt = (n) => (n === null ? '—' : n.toFixed(1));
+
+              // --- UV ---
+              const uvEnt = states['sensor.la_gorgue_uv'];
+              const uvVal = uvEnt ? toNum(uvEnt.state) : null;
+              const uvTxt = (uvVal === null) ? '—' : uvVal.toFixed(0);
+
+              let uvLevel = '—';
+              if (uvVal !== null) {
+                const u = Math.round(uvVal);
+                if (u <= 2) uvLevel = 'faible';
+                else if (u <= 5) uvLevel = 'modéré';
+                else if (u <= 7) uvLevel = 'élevé';
+                else if (u <= 10) uvLevel = 'très fort';
+                else uvLevel = 'extrême';
+              }
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:60px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div style="width:32px; display:flex; justify-content:center; align-items:flex-start;">
+                      <ha-icon icon="mdi:sun-thermometer-outline" style="width:30px;height:30px;color:black;margin-right:1px"></ha-icon>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Prévision pour aujourd'hui
+                      </div>
+
+                      <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:5px;
+                        font-size:23px;
+                        font-weight:500;
+                        color:#000;
+                      ">
+                        <span style="display:flex;align-items:center;gap:4px;">
+                          ${fmt(tmin)}°  /
+                        </span>
+                        <span style="display:flex;align-items:center;gap:4px;">
+                          ${fmt(tmax)}°
+                        </span>
+                      </div>
+
+                      <div style="color:black;font-size:15px;font-weight:500;">
+                        Indice UV ${uvTxt} (${uvLevel})
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 8
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - background: transparent
+            - border: none
+            - height: 160px
+            - box-shadow: none
+            - padding: 0
+            - position: relative
+            - overflow: hidden
+            - margin-left: 1px
+            - margin-top: "-33px"
+          grid:
+            - grid-template-areas: |
+                "row1"
+                "row2"
+            - grid-template-rows: 1fr 1fr
+            - row-gap: 6px
+        custom_fields:
+          row1: |
+            [[[
+              const r = states['sensor.sejour_pluviometre_precipitation_aujourd_hui']?.state ?? '—';
+              const rNum = Number(r);
+
+              // format : 0.0 mm si nombre, sinon '—'
+              const rTxt = Number.isFinite(rNum) ? (Math.round(rNum * 10) / 10).toFixed(1) : r;
+
+              // unité depuis le capteur si dispo, sinon mm
+              const unit = states['sensor.sejour_pluviometre_precipitation_aujourd_hui']?.attributes?.unit_of_measurement ?? 'mm';
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                      <ha-icon icon="mdi:weather-rainy" style="width:30px;height:30px;color:black;"></ha-icon>
+                    </div>
+
+                    <div style="text-align:left;">
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Précipitation cumulée
+                      </div>
+
+                      <div style="color:black;font-size:23px;font-weight:500;margin-top:6px;">
+                        ${rTxt} ${unit} <span style="font-size:15px; font-weight:600"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+          row2: |
+            [[[
+              const capRaw = states['sensor.niveau_de_la_cuve_d_eau_de_pluie_en_pourcentage']?.state;
+              const capNum = Number(capRaw);
+              const capacite = Number.isFinite(capNum) ? Math.max(0, Math.min(100, capNum)) : null;
+
+              // distance en cm
+              const distance = states['number.niveau_de_la_cuve_d_eau_de_pluie_en_cm']?.state ?? '—';
+
+              // couleur remplissage
+              const color ='#555';
+
+              const width = capacite === null ? 0 : capacite;
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+
+                  <div style="
+                    width:8px;
+                    height:60px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+
+                    <div style="width:32px; display:flex; justify-content:center; align-items:center;">
+                      <ha-icon icon="mdi:propane-tank-outline" style="width:30px;height:30px;color:black;"></ha-icon>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:6px; text-align:left; width:100%;">
+
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Réserve eau de pluie
+                      </div>
+
+                      <div style="font-size:23px;font-weight:500;color:black; line-height:1;">
+                        ${capacite === null ? '—' : `${capacite}%`}
+                      </div>
+
+                      <!-- Jauge (sans animation) -->
+                      <div style="
+                        width: 165px;
+                        height: 6px;
+                        border: 1px solid #000;
+                        border-radius: 999px;
+                        background: transparent;
+                        position: relative;
+                        overflow: hidden;
+                        margin-top: 5px;
+                        margin-bottom: 5px;
+                      ">
+                        <div style="
+                          width: ${width}%;
+                          height: 100%;
+                          border-radius: 999px;
+                          background: ${color};
+                        "></div>
+                      </div>
+
+                    </div>
+
+                  </div>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 8
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - background: transparent
+            - border: none
+            - height: 160px
+            - box-shadow: none
+            - padding: 0
+            - position: relative
+            - overflow: hidden
+            - margin-left: 24px
+            - margin-top: "-33px"
+          grid:
+            - grid-template-areas: |
+                "row1"
+                "row2"
+            - grid-template-rows: 1fr 1fr
+            - row-gap: 6px
+        custom_fields:
+          row1: |
+            [[[
+              const p = states['sensor.sejour_pression_atmospherique']?.state
+                ?? states['sensor.sejour_pression']?.state
+                ?? '—';
+
+              const pNum = Number(p);
+              const pTxt = Number.isFinite(pNum) ? Math.round(pNum) : p;
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:42px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div style="width:30px; display:flex; justify-content:center; align-items:center;">
+                      <ha-icon icon="mdi:gauge-low" style="width:28px;height:28px;color:black;"></ha-icon>
+                    </div>
+
+                    <div style="text-align:left;">
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Pression atmosphérique
+                      </div>
+                      <div style="color:black;font-size:23px;font-weight:500;margin-top:6px;">
+                        ${pTxt} hPa
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+          row2: |
+            [[[
+              const ws = states['sensor.sejour_anemometre_vitesse_du_vent']?.state ?? '—';
+              const wg = states['sensor.vent_vitesse_maximum_24h']?.state ?? '—';
+
+              // direction: ton capteur "angle" + fallback possible
+              const wd = states['sensor.sejour_anemometre_angle_du_vent']?.state
+                ?? states['sensor.sejour_anemometre_direction_du_vent']?.state
+                ?? '—';
+
+              const wsNum = Number(ws);
+              const wgNum = Number(wg);
+              const wdNum = Number(wd);
+
+              const wsTxt = Number.isFinite(wsNum) ? Math.round(wsNum) : ws;
+              const wgTxt = Number.isFinite(wgNum) ? Math.round(wgNum) : wg;
+
+              function degToCardinal(d) {
+                if (!Number.isFinite(d)) return '—';
+                const dirs = ['Nord','Nord-Est','Est','Sud-Est','Sud','Sud-Ouest','Ouest','Nord-Ouest'];
+                return dirs[Math.round(d / 45) % 8];
+              }
+              const wdTxt = degToCardinal(wdNum);
+
+              const wsUnit = states['sensor.sejour_anemometre_vitesse_du_vent']?.attributes?.unit_of_measurement ?? '';
+              const wgUnit = states['sensor.sejour_anemometre_force_des_rafales']?.attributes?.unit_of_measurement ?? wsUnit;
+
+              return `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <div style="
+                    width:8px;
+                    height:60px;
+                    border-radius:4px;
+                    background:
+                      radial-gradient(circle, rgba(0,0,0,0.55) 1px, transparent 1.6px)
+                      0 0 / 4px 4px;">
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div style="width:30px; display:flex; justify-content:center; align-items:flex-start;">
+                      <ha-icon icon="mdi:weather-windy" style="width:28px;height:28px;color:black;"></ha-icon>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                      <div style="color:black;font-size:14px;font-weight:700;">
+                        Anémomètre
+                      </div>
+
+                      <div style="color:black;font-size:23px;font-weight:500;">
+                        ${wsTxt}${wsUnit ? ` ${wsUnit}` : ''} 
+                      <span style="font-size:15px; font-weight:500">
+                      (${wgTxt}${wgUnit ? ` ${wgUnit}` : ''})
+                      </span>
+                      </div>
+
+                      <div style="color:black;font-size:15px;font-weight:500;">
+                        Direction ${wdTxt}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 8
+    column_span: 3
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        styles:
+          card:
+            - height: 40px
+            - width: 776px
+            - border: none
+            - box-shadow: none
+            - padding: 0
+            - margin: 0
+            - background: "#eeeeee"
+            - margin-top: "-8px"
+            - margin-left: "-20px"
+          grid:
+            - grid-template-areas: "\"main\""
+            - grid-template-columns: 1fr
+            - grid-template-rows: 1fr
+            - justify-items: stretch
+            - align-items: center
+          custom_fields:
+            main:
+              - width: 100%
+              - padding: 0 12px
+              - box-sizing: border-box
+        custom_fields:
+          main: |
+            [[[
+              const left = "Station météo Netatmo by DHN";
+
+              // Heure
+              const d = new Date();
+              const hh = String(d.getHours()).padStart(2,'0');
+              const mm = String(d.getMinutes()).padStart(2,'0');
+              const right = `La Gorgue (${hh}:${mm})`;
+
+              // Vigilance
+              const a = states['sensor.59_weather_alert'];
+              const s = a ? String(a.state).toLowerCase() : 'unknown';
+
+              // adapte ici si ton capteur renvoie déjà "Jaune/Orange/Rouge"
+              let vig = '';
+              if (['yellow','jaune'].includes(s)) vig = 'Jaune';
+              else if (['orange'].includes(s)) vig = 'Orange';
+              else if (['red','rouge'].includes(s)) vig = 'Rouge';
+              else vig = ''; // vert / none => rien
+
+              const center = vig ? `
+                <span style="
+                  display:flex;
+                  align-items:center;
+                  gap:6px;
+                  white-space:nowrap;
+                  font-weight:600;
+                ">
+                  <ha-icon icon="mdi:alert-outline" style="margin-bottom:5px;width:18px;height:18px;color:#000;"></ha-icon>
+                  Vigilance ${vig}
+                </span>
+              ` : `<span></span>`;
+
+              return `
+                <div style="
+                  width:100%;
+                  display:grid;
+                  grid-template-columns: auto 1fr auto;
+                  align-items:center;
+                  font-size:16px;
+                  font-weight:500;
+                  color:#000;
+                ">
+                  <span style="white-space:nowrap; display:flex; align-items:center;">${left}</span>
+
+                  <div style="display:flex; justify-content:center;">
+                    ${center}
+                  </div>
+
+                  <span style="white-space:nowrap;">${right}</span>
+                </div>
+              `;
+            ]]]
+        grid_options:
+          columns: 24
+    column_span: 3
+cards: []
+max_columns: 3
+header:
+  layout: start
+  badges_position: bottom
+  badges_wrap: wrap
