@@ -2,6 +2,7 @@
 Station météo Netatmo sur écran TRMNL via Home Assistant
 
 <img width="2048" height="1536" alt="image" src="https://github.com/user-attachments/assets/e118030c-8d4c-4d6b-98ac-c169708cfda0" />
+<br>
 
 Je voulais vous présenter un petit projet de "station météo améliorée" que je viens de terminer sur base d’écran e-ink.
 
